@@ -40,7 +40,7 @@ The table hereafter provides some links to the resources we have used for this a
 |     aPP2013             |     Mean likelihood of living in   poverty per grid square                                                                                                   |     https://www.worldpop.org/doi/10.5258/SOTON/WP00020                                                                                    |
 |     aWealthIndex2011    |     Mean DHS wealth index score   per grid square                                                                                                            |     https://www.worldpop.org/doi/10.5258/SOTON/WP00020                                                                                    |
 
-## Some good practices for file management
+### Some good practices for file management {-}
 
 We need a minimum of organisation in the data and code folders, as well as some R packages.
 
@@ -48,13 +48,11 @@ We need a minimum of organisation in the data and code folders, as well as some 
 # GIS packages
 library(raster) ## for reading "RASTER" files
 library(rgdal)  ## for reading "shapefiles"
-library(sp)     ## for adjusting CRS in 
-
+library(sp)     
 
 # Tidy data management packages
 library(dplyr)
 library(data.table)
-
 
 # Plotting packages
 library(ggplot2)
@@ -86,7 +84,7 @@ CreatedData<-paste(source_folder, "CreatedData/" , sep="")
 
 # 2. Understanding child marriage using geo-covariates
 
-## The DHS survey
+## The DHS survey 
 
 ```{r}
 # Reading DHS survey data 
@@ -99,9 +97,7 @@ cluster_average<-aggregate(Before15~DHSCLUST,
                            FUN=mean)  
 ```
 
-# 3. Integrating DHS and geospatial data
-
-## Reading the DHS Shapefile 
+### Reading the DHS Shapefile {-} 
 
 ```{r}
 # Reading DHS Shapefile 
@@ -113,7 +109,7 @@ shapedata<-shapedata[shapedata$LATNUM>0, ]          # Drops negative Latnum
 
 ### Cluster locations by urban and rural from the shapefile (DHS Bangladesh 2014) {-}
 
-We can use the *latitude* and *longitude* of each observation  to draw a "location map" of the clusters. This generates the **Figure 3** of the document.  
+We can use the *latitude* and *longitude* of each observation  to draw a "location map" of the clusters.  
 
 >This is not really "a map", but only points with latitude and longitude defined represented on a grid
 
@@ -142,37 +138,154 @@ map_projected
 
 
 
+## Using GIS sources 
 
-## Reading raster files 
- 
-```{r}
+### Matching DHS (Shapefile) and raster files CRS {-} 
+
+We need to know what is the **CRS** (Coordinates Reference System) for the Raster file in order to use the same for the DHS data and to have exact correspondance of the two geographical systems
+
+
+```{r, results= TRUE}
 # Reading geographic data - access to cities
 accessData<-raster(paste(geodata_folder,
                          "accessibility_to_cities_2015.tif",
                          sep=""))
 accessData
 ```
+Here the CRS is "*CRS = +proj=longlat +datum=WGS84 +no_defs*" so w know it is using the *WGS84*^[WGS 84 is an Earth-centered, Earth-fixed terrestrial reference system and geodetic datum. WGS 84 is based on a consistent set of constants and model parameters that describe the Earth's siz and shape (see https://en.wikipedia.org/wiki/World_Geodetic_System.]
 
+> We need to provide the same  projection reference for the DHS data (shapefile)
 
 ```{r}
-#  We need to provide the same  projection reference 
+
 #  We use sp::spTransform to tell wich CRS is used.
 
 dhsShapeData2 <- spTransform(dhsShapeData, accessData@crs)
 ```
 
-## Extracting values from a raster    
+### Extracting values from a raster {-}    
 
 We can now **extract** the values from the *acessData* file (a Raster object) at the locations of our household (shapefile). The result is a data frame. The first column is a sequential ID, the other columns are the extracted values, i.e. the travel time to a city for each cluster. 
 
 > Extracting values takes time. 
+
+#### Example with the poverty index (Mean likelihood of living in poverty per grid square - *worldpop.org*) 
+
+First we read the raster file
+```{r RasterReadingAPP, cache = TRUE}
+# Reading raster file for aPP2013 
+aPPData<-raster(paste(geodata_folder, "bgd2013ppipov.tif", sep=""))
+```
+
+we can visualize the information on a map. 
+```{r}
+# Main plot using the plotting function of raster package
+plot(aPPData, 
+     breaks=c(0, 60, 70, 75, 80, 85, 100, 150),  
+     col = terrain.colors(8),
+     main="Poverty Map") 
+```
+
+Second we extract the information for each cluster location. 
+
+```{r RasterExtractionAPP, cache = TRUE}
+dhs_all2000 <- extract(aPPData,         # Raster file
+                       dhsShapeData,    # Shapefile     
+                       buffer = 2000,   # buffer size (meters) around each cluster 
+                       df=TRUE)         # returns a data frame
+
+dhs_all2000<-as.data.frame(dhs_all2000) # Because it may not return a data frame
+
+temp<-dhs_all2000[!is.na(dhs_all2000$bgd2013ppipov), ]  # removing NAs in poverty estimates
+
+# There may be several poverty estimates in values in each cluster 
+# Aggregating at the cluster level
+
+aPPData.agg<-aggregate(temp$bgd2013ppipov,
+                       by=list(temp$ID),
+                       FUN=mean)                      
+# Adding column name
+colnames(aPPData.agg)<-c("DHSCLUST", "aPP2013")
+# save(aPPData.agg, file="CreatedData/aPPData.Rda")
+```
+
+#### Map of PSU locations on poverty map from the raster file {-}
+
+```{r}
+# Main plot using the plotting function of raster package
+plot(aPPData, 
+     breaks=c(0, 60, 70, 75, 80, 85, 100, 150),  
+     col = terrain.colors(8),
+     main="Map of PSU locations on Poverty Map", 
+     sub="Probability of Poverty") 
+
+# We can add points for each cluster location on this map
+points(x=shapedata$LONGNUM, 
+       y=shapedata$LATNUM, 
+       type="p", 
+       cex=0.3, 
+       pch=21, 
+       bg=1)
+```
+
+
+### Importing other geographical information from other raster files {-}
+
+The exact same operations can be done with all the other geographic files we have identified
+
+
+> These operations take time and you want to skip these steps and upload directly the file created. 
+
+####  Aridity Index (Global Aridity Index - *wordclim.org*) {-}
+
+```{r RasterExtractionAridity, cache = TRUE, eval =FALSE}
+# Reading raster file for Aridity2015 
+# memory.limit(9999999999)
+# aridityData <- raster(readGDAL(paste(geodata_folder, "AI_annual/ai_yr/w001001.adf", sep="")))
+# dhsShapeData2 <- spTransform(dhsShapeData, aridityData@crs)
+# dhs_all2000 <- extract(aridityData,
+#                        dhsShapeData2,
+#                        buffer = 2000,
+#                        df=TRUE)
+# dhs_all2000<-as.data.frame(dhs_all2000)
+# dhs_all2000<-dhs_all2000[!is.na(dhs_all2000$band1),]
+# 
+#  aridityData.agg<-aggregate(dhs_all2000$band1,
+#                             by=list(dhs_all2000$ID),
+#                             FUN=mean)
+# colnames(aridityData.agg)<-c("DHSCLUST", "Aridity2015")
+# #save(aridityData.agg, file="CreatedData/aridityData.Rda")
+```
+
+####  Wealth Index (Mean wealth index score - *Worldpop.org* ) {-}
+
+```{r RasterExtractionWealth, cache = TRUE, eval=FALSE}
+# Reading raster file for aWealthindex2011 
+# aWIData<-raster(paste(geodata_folder, "bgd2011wipov.tif", sep=""))
+# dhs_all2000 <- extract(aWIData,    
+#                        dhsShapeData,          
+#                        buffer = 2000,     
+#                        df=TRUE)           
+# dhs_all2000<-as.data.frame(dhs_all2000)
+# temp<-dhs_all2000[!is.na(dhs_all2000$bgd2011wipov), ]
+# 
+# aWIData.agg<-aggregate(temp$bgd2011wipov,
+#                        by=list(temp$ID),
+#                        FUN=mean)
+# colnames(aWIData.agg)<-c("DHSCLUST", "aWealthIndex2011")
+# #save(aWIData.agg, file="CreatedData/aWIData.Rda")
+
+```
+
+####  Travel Time to Cities Index (Nature - Extracted  from Google Maps Platform Distance Matrix API) {-}
+*Travelling time (in minutes) to the nearest city of more than 50,000 people*
 
 ```{r RasterExtractionAccess, cache = TRUE}
 # !LENGHTY OPERATION!
 
 # Data extraction using the matching between raster and Spatial data
 
-# CAUTION: In the following chunks, the data.fram
+# CAUTION: In the following chunks, the data.frame
 #  dhs_all2000 is used as a generic data.frame (temporary)
 
 # dhs_all2000 <- raster::extract(accessData,     # raster layer
@@ -181,12 +294,9 @@ We can now **extract** the values from the *acessData* file (a Raster object) at
 #                                 df=TRUE)       # returns a dataframe
 #     
 # dhs_all2000<-as.data.frame(dhs_all2000)
-```
 
+### Filtering to remove na values and distances equal to 0. 
 
-```{r}
-
-# Filtering to remove na values and distances equal to 0. 
 # dhs_all2000<-dhs_all2000[!is.na(dhs_all2000$accessibility_to_cities_2015)
 #                          & dhs_all2000$accessibility_to_cities_2015>=0, ]
 # 
@@ -201,12 +311,7 @@ We can now **extract** the values from the *acessData* file (a Raster object) at
 # save(accessData.agg, file="CreatedData/accessData.Rda")
 ```
 
-## Importing other geographical information files
-
-The exact same operations can be done with all the other geographic files we have identified
-
-
-> These operations take time and you want to skip these steps and upload directly the file created (see Section 4). 
+#### Urbanization Index (Degree of urbanization - *Europa.eu*) {-} 
 
 ```{r RasterExtractionSmod, cache = TRUE, eval =FALSE}
 # !LENGHTY OPERATION!
@@ -228,6 +333,8 @@ The exact same operations can be done with all the other geographic files we hav
 ```
 
 
+#### Building concentration index (Percentage of building - * European Union*) {-} 
+ 
 ```{r RasterExtractionBuildup, cache = TRUE, eval =FALSE}
 # # Reading raster file for Buildup2015 
 # buildupData<-raster(paste(geodata_folder, "GHS_BUILT_LDS2014_GLOBE_R2016A_54009_1k_v1_0.tif", sep=""))
@@ -245,6 +352,7 @@ The exact same operations can be done with all the other geographic files we hav
 # save(buildupData.agg, file="CreatedData/buildupData.Rda")
 ```
 
+#### Density Index (Number of inhabitants per cell (1km X 1km) - *European Union* ) {-} 
 
 ```{r RasterExtractionDensity, cache = TRUE, eval =FALSE}
 # # Reading raster file for Density2015 
@@ -263,6 +371,7 @@ The exact same operations can be done with all the other geographic files we hav
 # save(densityData.agg, file="CreatedData/densityData.Rda")
 ```
 
+#### Income Index (Estimates of income in USD per grid square - *Worldpop.org*) {-} 
 
 ```{r RasterExtractionIncome, cache = TRUE, eval =FALSE}
 # # Reading raster file for aIncome2013 
@@ -279,83 +388,6 @@ The exact same operations can be done with all the other geographic files we hav
 #                        FUN=mean)
 # colnames(aICData.agg)<-c("DHSCLUST", "aIncome2013")
 # save(aICData.agg, file="CreatedData/aICData.Rda")
-```
-
-
-```{r RasterExtractionAPP, cache = TRUE}
-# Reading raster file for aPP2013 
-aPPData<-raster(paste(geodata_folder, "bgd2013ppipov.tif", sep=""))
-dhs_all2000 <- extract(aPPData,    
-                       dhsShapeData,          
-                       buffer = 2000,     
-                       df=TRUE)           
-dhs_all2000<-as.data.frame(dhs_all2000)
-temp<-dhs_all2000[!is.na(dhs_all2000$bgd2013ppipov), ]
-
-aPPData.agg<-aggregate(temp$bgd2013ppipov,
-                       by=list(temp$ID),
-                       FUN=mean)
-colnames(aPPData.agg)<-c("DHSCLUST", "aPP2013")
-# save(aPPData.agg, file="CreatedData/aPPData.Rda")
-```
-
-### Map of PSU locations on poverty map from the raster file {-}
-
-
-```{r}
-# Main plot using the plotting function of raster package
-plot(aPPData, 
-     breaks=c(0, 60, 70, 75, 80, 85, 100, 150),  
-     col = terrain.colors(8),
-     main="Map of PSU locations on Poverty Map", 
-     sub="Probability of Poverty") 
-
-# We can add points for each cluster location on this map
-points(x=shapedata$LONGNUM, 
-       y=shapedata$LATNUM, 
-       type="p", 
-       cex=0.3, 
-       pch=21, 
-       bg=1)
-```
-
-
-```{r RasterExtractionAridity, eval =FALSE}
-# Reading raster file for Aridity2015 
-memory.limit(9999999999)
-aridityData <- raster(readGDAL(paste(geodata_folder, "AI_annual/ai_yr/w001001.adf", sep="")))
-dhsShapeData2 <- spTransform(dhsShapeData, aridityData@crs)
-dhs_all2000 <- extract(aridityData,
-                       dhsShapeData2,
-                       buffer = 2000,
-                       df=TRUE)
-dhs_all2000<-as.data.frame(dhs_all2000)
-dhs_all2000<-dhs_all2000[!is.na(dhs_all2000$band1),]
-
- aridityData.agg<-aggregate(dhs_all2000$band1,
-                            by=list(dhs_all2000$ID),
-                            FUN=mean)
-colnames(aridityData.agg)<-c("DHSCLUST", "Aridity2015")
-#save(aridityData.agg, file="CreatedData/aridityData.Rda")
-```
-
-
-```{r RasterExtractionWealth, cache = TRUE, eval=FALSE}
-# Reading raster file for aWealthindex2011 
-aWIData<-raster(paste(geodata_folder, "bgd2011wipov.tif", sep=""))
-dhs_all2000 <- extract(aWIData,    
-                       dhsShapeData,          
-                       buffer = 2000,     
-                       df=TRUE)           
-dhs_all2000<-as.data.frame(dhs_all2000)
-temp<-dhs_all2000[!is.na(dhs_all2000$bgd2011wipov), ]
-
-aWIData.agg<-aggregate(temp$bgd2011wipov,
-                       by=list(temp$ID),
-                       FUN=mean)
-colnames(aWIData.agg)<-c("DHSCLUST", "aWealthIndex2011")
-#save(aWIData.agg, file="CreatedData/aWIData.Rda")
-
 ```
 
 
@@ -443,7 +475,7 @@ formula_string<- paste(Y, paste(colnames(DataMerged1)[XCovars], collapse=" + "),
 print(paste(" Regression formula: ",formula_string))
 
 ```
-### Results as in **Figure 7**
+### Results {-}
 
 ```{r, results='asis'}
 # Logistics Regression
@@ -526,7 +558,7 @@ myRandomForest
 ```
 
 
-### Variable importance plot as in Figure 12 
+### Variable importance plot {-}
 
 ```{r}
 varImpPlot(myRandomForest, 
