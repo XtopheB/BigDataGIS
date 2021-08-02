@@ -1,7 +1,7 @@
 ---
 title: "Using GIS environmental data for gender statistics analysis"
 subtitle: "A step-by-step case study with Bangladesh data "
-author: "Christophe Bontemps & Eunkoo Lee (SIAP)"
+author: "Christophe Bontemps & Eunkoo Lee - SIAP"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -67,8 +67,6 @@ The *raw* files we have downloaded (and which are heavy) can be stored in a proj
 
 ```{r}
 # --- Change to YOUR project folder HERE  ---- #
-
-# source_folder<-"c:/GitMain/UNWomen-GISBangladesh/"
 source_folder<-"c:/Chris/UN-ESCAP/MyCourses/GenderStats/Code/Annex2/"
 
 data_folder<-paste(source_folder,"Data/",sep="")
@@ -251,7 +249,7 @@ The exact same operations can be done with all the other geographic files we hav
 
 > These operations take time and you want to skip these steps and upload directly the file created. 
 
-####  Aridity Index (Global Aridity Index - *wordclim.org*) {-}
+####  **Aridity** Index (Global Aridity Index - *wordclim.org*) {-}
 
 ```{r RasterExtractionAridity, cache = TRUE, eval =FALSE}
 # # Reading raster file for Aridity2015 
@@ -272,7 +270,7 @@ The exact same operations can be done with all the other geographic files we hav
 # #save(aridityData.agg, file="CreatedData/aridityData.Rda")
 ```
 
-####  Wealth Index (Mean wealth index score - *Worldpop.org* ) {-}
+####  **Wealth** Index (Mean wealth index score - *Worldpop.org* ) {-}
 
 ```{r RasterExtractionWealth, cache = TRUE, eval=FALSE}
 # # Reading raster file for aWealthindex2011 
@@ -293,7 +291,7 @@ The exact same operations can be done with all the other geographic files we hav
 
 ```
 
-####  Travel Time to Cities Index (Nature - Extracted  from Google Maps Platform Distance Matrix API) {-}
+####  **Access to Cities** Index (Nature - Extracted  from Google Maps Platform Distance Matrix API) {-}
 *Travelling time (in minutes) to the nearest city of more than 50,000 people*
 
 ```{r RasterExtractionAccess, cache = TRUE}
@@ -325,7 +323,7 @@ The exact same operations can be done with all the other geographic files we hav
 # save(accessData.agg, file="CreatedData/accessData.Rda")
 ```
 
-#### Urbanization Index (Degree of urbanization - *Europa.eu*) {-} 
+#### **Urbanization** Index (Degree of urbanization - *Europa.eu*) {-} 
 
 ```{r RasterExtractionSmod, cache = TRUE, eval =FALSE}
 # # Reading raster file for SMOD2015 
@@ -345,7 +343,7 @@ The exact same operations can be done with all the other geographic files we hav
 ```
 
 
-#### Building concentration index (Percentage of building - * European Union*) {-} 
+#### **Building concentration** index (Percentage of building - *European Union*)  {-} 
  
 ```{r RasterExtractionBuildup, cache = TRUE, eval =FALSE}
 # # Reading raster file for Buildup2015 
@@ -364,7 +362,7 @@ The exact same operations can be done with all the other geographic files we hav
 # save(buildupData.agg, file="CreatedData/buildupData.Rda")
 ```
 
-#### Density Index (Number of inhabitants per cell (1km X 1km) - *European Union* ) {-} 
+#### **Population Density** Index (Number of inhabitants per cell (1km X 1km) - *European Union* ) {-} 
 
 ```{r RasterExtractionDensity, cache = TRUE, eval =FALSE}
 # # Reading raster file for Density2015 
@@ -383,7 +381,7 @@ The exact same operations can be done with all the other geographic files we hav
 # save(densityData.agg, file="CreatedData/densityData.Rda")
 ```
 
-#### Income Index (Estimates of income in USD per grid square - *Worldpop.org*) {-} 
+#### **Income** Index (Estimates of income in USD per grid square - *Worldpop.org*) {-} 
 
 ```{r RasterExtractionIncome, cache = TRUE, eval =FALSE}
 # # Reading raster file for aIncome2013 
@@ -403,7 +401,7 @@ The exact same operations can be done with all the other geographic files we hav
 ```
 
 
-# 4. Logistic regression and Random Forests 
+# Logistic regression and Random Forests 
 
 The DHS survey records individual information on various aspects and 
 
@@ -433,6 +431,7 @@ load(url("https://www.unsiap.or.jp/on_line/Big_Data/aICData.Rda"))
 load(url("https://www.unsiap.or.jp/on_line/Big_Data/aPPData.Rda"))
 ```
 
+## Data Analysis
 For our analysis, we will first merge all the geospatial  information into a simple data frame. We create a function (*dhsdataMerge*) for that.  
 
 ```{r}
@@ -462,6 +461,8 @@ data.agg<-dhsdataMerge(cluster_average)
 
 ### Correlation plot {-}
 
+Before we begin our statistical analysis, we can look at the general relationships of the independent variable by calculating the correlation matrix. Using R, we can easily create a correlation plot for the eight geo-covariates to investigate whether there is any relationship between them. 
+
 > It is always a good practice to analyse the relationships between the variables
 
 ```{r }
@@ -478,9 +479,9 @@ ggcorrplot(corr_coef,
 
 ```
 
-## 4.2 Logistic regression
+## Logistic regression
 
-We will use the DHS survey at the individual level and construct a binary response variable indicating whether there was marriage before 15 years old (or "*girl's marriage*". We will try to understand which factor**S** may affect the probability to observe girl's marriage, and in particular whether, after controlling for the usual individual factors such as education, wealth and other socioeconomic factors, there is also an impact of environmental factors.   
+We will use the DHS survey at the individual level and construct a binary response variable indicating whether there was marriage before 15 years old (or "*girl's marriage*"). We will try to understand which factor**S** may affect the probability to observe girl's marriage, and in particular whether, after controlling for the usual individual factors such as education, wealth and other socioeconomic factors, there is also an impact of environmental factors.   
 
 
 ```{r}
@@ -523,6 +524,9 @@ kable(pretty_lm2, digits = 3)
 
 
 ### Confusion Matrix {-}
+
+The confusion matrix shows how well the model predicted the outcome. If the model was perfect, we would only have elements on the diagonal of this matrix and 0’s everywhere. In total, the model misclassified (1426 + 4442)/21262 = **29%** of the outcome, which yields **an accuracy of 71 per cent** (100%-29%).
+
 ```{r, results=TRUE }
 library("regclass")
 confusion_matrix(glm.fit)
@@ -530,7 +534,7 @@ confusion_matrix(glm.fit)
 
 
 ### Visual representation of the logistic model{-} 
-
+We can also visualize the effect of some of the most significant variables in the model. 
 
 ```{r visreg}
 library(visreg)
@@ -569,10 +573,16 @@ figure <- ggarrange( p.age, p.education, p.aridity, p.income,
 figure
 ```
 
+We can see the marginal effects  of significant predictors in the model. The probability of being married before 15 increases with age. This shows the higher prevalence of the practice in the past.
 
-# 4.3 Random Forests  
+As the level of education increases, the probability decreases. We can notice a clear drop in the probability between the category “incomplete secondary” and “complete secondary”. 
+
+> As the aridity (Aridity2015) level increases, the probability decreases. As the level of income (aPP2013) increases, the probability decreases. 
+
+# Random Forests  
  
- 
+Random Forests is basically a collection of many decision trees. Rather than considering a single decision tree, Random Forests creates a wide variety of trees by using a bootstrapped sample from the original data and considering only a subset of the variables for split nodes until it reaches the terminal nodes. The variables for split nodes are randomly chosen from a subset of variables (e.g. *Aridity*, *SMOD2015*) that minimize the variance in the child nodes. By repeating this process many times (n=500 by default in R), this results in a forest of different decision trees. 
+
 ```{r RF, cache = TRUE}
 set.seed(888)               # set random seed so we can reproduce the result
 myRandomForest<-randomForest(as.formula(formula_string),
@@ -584,15 +594,22 @@ myRandomForest<-randomForest(as.formula(formula_string),
                              na.action = na.roughfix)
 ```
 
+We use *randomForest* package in R to fit a Random Forests model. The default number of trees is set to 500 in R, but we can also set the number of trees of our choice (*ntree=1000*).
+
 ### Accuracy rate and confusion Matrix {-}
+
+
 
 ```{r, results = TRUE}
 myRandomForest
 
 ```
 
+ The error rate of our model is **27.44 %**, which means the accuracy of the model is about **73 per cent**. This is slightly higher than the logistic regression model (71 per cent). 
 
 ### Variable importance plot {-}
+
+Using the *varImPlot* function in R, we can find out which variables play an important role in the model. The variable importance plot basically shows the mean decrease in accuracy when we remove each variable while making the decision tree.
 
 ```{r}
 varImpPlot(myRandomForest, 
@@ -600,5 +617,21 @@ varImpPlot(myRandomForest,
            main =" Importance Plot for Random Forest Model")
 ```
 
+The first four important variables are “*Education*”, “*Age*”, “*aPP2013*” and “*Aridity 2015*”. This is also consistent with the result we get from the logistic regression where these variables were also significant. 
 
+# Conclusion
 
+The results suggest that: 
+
+-  “*Education*”, 
+- “*Age*”, 
+- “*Poverty*" (aPP2013) and 
+- “*Aridity*” 
+
+are important variables in explaining and predicting the outcome of marriage before 15 in Bangladesh.
+
+It is intuitive that “Education” empowers women and it significantly reduces the probability of being married before 15. *Age* is positively related to the probability of being married before 15,  suggesting that child marriage is relatively more prevalent in the past, and reveals relative improvements over recent years. 
+
+> Using GIS data, we showed that the *level of aridity*, which measures humidity and rain fall, is significant in predicting child marriage before 15. 
+
+Further research is needed to provide insights on these findings. 
