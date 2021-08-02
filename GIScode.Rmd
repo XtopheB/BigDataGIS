@@ -86,18 +86,21 @@ CreatedData<-paste(source_folder, "CreatedData/" , sep="")
 
 ## The DHS survey 
 
+The DHS Bangladesh 2014 provides useful demographic and socioeconomic variables (e.g. age, sex, age at first marriage, marital status, education, wealth index, etc.) that can be used to analyze the impact of each of these variables on child marriage. 
+
+
 ```{r}
 # Reading DHS survey data 
 DHS<-read.csv(file = paste0(source_folder,'Data/bangladesh.csv'))  # reading DHS Bangladesh 2014
 DHS$Age<-as.numeric(DHS$Age)
 
-#Computing the proportion of getting married before 15 by cluster
-cluster_average<-aggregate(Before15~DHSCLUST,
-                           data=DHS,
-                           FUN=mean)  
 ```
 
 ### Reading the DHS Shapefile {-} 
+
+In addition to the survey variables, the *DHS survey* collect GPS location data of surveyed clusters.
+
+> The coordinates of each cluster, along with other geographic information, is stored in the GIS *shapefile* that can be [downloaded](https://dhsprogram.com/data/available-datasets.cfmhttps://dhsprogram.com/data/available-datasets.cfm) together with the DHS survey. 
 
 ```{r}
 # Reading DHS Shapefile 
@@ -111,7 +114,7 @@ shapedata<-shapedata[shapedata$LATNUM>0, ]          # Drops negative Latnum
 
 We can use the *latitude* and *longitude* of each observation  to draw a "location map" of the clusters.  
 
->This is not really "a map", but only points with latitude and longitude defined represented on a grid
+NB: This is not really "a map", but only points with latitude and longitude defined represented on a grid
 
 
 ```{r}
@@ -140,7 +143,7 @@ map_projected
 
 ## Using GIS sources 
 
-### Matching DHS (*Shapefile*) and CIS (*raster*) files using CRS {-} 
+### Matching DHS (*Shapefile*) and GIS (*raster*) files using CRS {-} 
 
 We need to know what is the **CRS** (Coordinates Reference System) for the Raster file in order to use the same for the DHS data and to have exact correspondence of the two geographical systems
 
@@ -196,7 +199,7 @@ plot(aPPData,
 ```{r RasterExtractionAPP, cache = TRUE}
 dhs_all2000 <- extract(aPPData,         # Raster file
                        dhsShapeData,    # Shapefile with DHS information   
-                       buffer = 2000,   # buffer size (meters) around each cluster 
+                       buffer = 2000,   # Buffer (meters) around each point where extracting values
                        df=TRUE)         # returns a data frame
 
 dhs_all2000<-as.data.frame(dhs_all2000) # Because it may not return a data frame
@@ -251,12 +254,12 @@ The exact same operations can be done with all the other geographic files we hav
 ####  Aridity Index (Global Aridity Index - *wordclim.org*) {-}
 
 ```{r RasterExtractionAridity, cache = TRUE, eval =FALSE}
-# Reading raster file for Aridity2015 
+# # Reading raster file for Aridity2015 
 # memory.limit(9999999999)
 # aridityData <- raster(readGDAL(paste(geodata_folder, "AI_annual/ai_yr/w001001.adf", sep="")))
-# dhsShapeData2 <- spTransform(dhsShapeData, aridityData@crs)
+# dhsShapeData <- spTransform(dhsShapeData, aridityData@crs)
 # dhs_all2000 <- extract(aridityData,
-#                        dhsShapeData2,
+#                        dhsShapeData,
 #                        buffer = 2000,
 #                        df=TRUE)
 # dhs_all2000<-as.data.frame(dhs_all2000)
@@ -272,8 +275,9 @@ The exact same operations can be done with all the other geographic files we hav
 ####  Wealth Index (Mean wealth index score - *Worldpop.org* ) {-}
 
 ```{r RasterExtractionWealth, cache = TRUE, eval=FALSE}
-# Reading raster file for aWealthindex2011 
+# # Reading raster file for aWealthindex2011 
 # aWIData<-raster(paste(geodata_folder, "bgd2011wipov.tif", sep=""))
+# dhsShapeData <- spTransform(dhsShapeData, aWIData@crs)
 # dhs_all2000 <- extract(aWIData,    
 #                        dhsShapeData,          
 #                        buffer = 2000,     
@@ -293,11 +297,15 @@ The exact same operations can be done with all the other geographic files we hav
 *Travelling time (in minutes) to the nearest city of more than 50,000 people*
 
 ```{r RasterExtractionAccess, cache = TRUE}
-# Data extraction using the matching between raster and Spatial data
-# dhs_all2000 <- raster::extract(accessData,     # raster layer
-#                                dhsShapeData2,  # SPDF with centroids for buffer
-#                                 buffer = 2000, # buffer size (meters)
-#                                 df=TRUE)       # returns a dataframe
+# # Reading raster file for  Access to Cities
+# accessData<-raster(paste(geodata_folder, "accessibility_to_cities_2015.tif", sep=""))
+# dhsShapeData <- spTransform(dhsShapeData, accessData@crs)
+
+# # Data extraction using the matching between raster and Spatial data
+# dhs_all2000 <- raster::extract(accessData,    # raster layer
+#                                dhsShapeData,  # SPDF with centroids for buffer
+#                                buffer = 2000, # buffer size (meters)
+#                                 df=TRUE)      # returns a dataframe
 #     
 # dhs_all2000<-as.data.frame(dhs_all2000)
 
@@ -320,13 +328,11 @@ The exact same operations can be done with all the other geographic files we hav
 #### Urbanization Index (Degree of urbanization - *Europa.eu*) {-} 
 
 ```{r RasterExtractionSmod, cache = TRUE, eval =FALSE}
-# !LENGHTY OPERATION!
-
 # # Reading raster file for SMOD2015 
 # smodData<-raster(paste(geodata_folder, "GHS_SMOD_POP2015_GLOBE_R2016A_54009_1k_v1_0.tif", sep=""))
-# dhsShapeData2 <- spTransform(dhsShapeData, smodData@crs)
+# dhsShapeData <- spTransform(dhsShapeData, smodData@crs)
 # dhs_all2000 <- extract(smodData,    # raster layer
-#                        dhsShapeData2,         
+#                        dhsShapeData,         
 #                        buffer = 2000,     
 #                        df=TRUE)           
 # dhs_all2000<-as.data.frame(dhs_all2000) 
@@ -443,7 +449,13 @@ dhsdataMerge<-function(originalData){
   datause<-datause[datause$DHSCLUST!=544,]
   return(datause)
 }
-# Using this function, we can merge the file cluster_average
+
+#Computing the proportion of getting married before 15 by cluster
+cluster_average<-aggregate(Before15~DHSCLUST,
+                           data=DHS,
+                           FUN=mean)  
+
+# Using the function dhsdataMerge(), we can merge the file DHS cluster_average
 # with all the Geo-covariate extracted at the cluster level
 data.agg<-dhsdataMerge(cluster_average) 
 ```
